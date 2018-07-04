@@ -8,8 +8,8 @@ var configuration = {
   refreshInterval: 600,
   pollingInterval: 5,
   s3: {
-    key: 'AKIAJSS2EY4KYDDOL2OQ',
-    secret: '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',
+    key: '',
+    secret: '',
     bucket: 'occomp1',
     region: 'ap-southeast-1',
     path: '//s3.amazonaws.com/occomp1/',
