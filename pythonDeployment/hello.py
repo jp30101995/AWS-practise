@@ -10,7 +10,7 @@ app = Flask(__name__)
 def hello():
     return "Hello World2!"
 
-@app.route('/login/<nm>',methods = ['POST', 'GET'])
+@app.route('/predict/<nm>',methods = ['POST', 'GET'])
 def login(nm):
    if request.method == 'POST':
        content = request.form["name"]
@@ -54,6 +54,14 @@ def implModel(content):
     # reg = linear_model.LinearRegression()
     # reg.fit ([[0, 0], [1, 1], [2, 2]], [0, 1, 2])
     # return reg.coef_
+
+
+@app.route('/sen_sim/<sen>',methods = ['POST', 'GET'])
+def sen_sim(sen):
+    user = request.args.get('sen')
+    #call sentense similarity function from main model
+    return user
+
 
 if __name__ == "__main__":
     app.run(debug=True,host='0.0.0.0')
