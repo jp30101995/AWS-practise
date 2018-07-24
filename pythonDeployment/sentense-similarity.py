@@ -9,53 +9,28 @@ import seaborn as sns
 import requests
 import nltk
 import gensim
-from gensim.models import Word2Vec
-from gensim.scripts.glove2word2vec import glove2word2vec
 import csv
 from sklearn.metrics.pairwise import cosine_similarity
 from collections import Counter
 import math
-from sklearn.decomposition import TruncatedSVD
-import torch
-import tensorflow_hub as hub
-import functools as ft
+from nltk import word_tokenize
+import gensim.downloader as api
+from gensim.models import Word2Vec
+from gensim.scripts.glove2word2vec import glove2word2vec
+import argparse
+from google.cloud import language
+from google.cloud.language import enums
+from google.cloud.language import types
+from nltk.corpus import wordnet as wn
+import re
+from subprocess import check_output
+from nltk.metrics import edit_distance
 
 
 
-def load_sts_dataset(filename):
-    # Loads a subset of the STS dataset into a DataFrame. In particular both
-    # sentences and their human rated similarity score.
-    sent_pairs = []
-    with tf.gfile.GFile(filename, "r") as f:
-        for line in f:
-            ts = line.strip().split("\t")
-            sent_pairs.append((ts[5], ts[6], float(ts[4])))
-    return pd.DataFrame(sent_pairs, columns=["sent_1", "sent_2", "sim"])
 
 
-def download_and_load_sts_data():
-    sts_dataset = tf.keras.utils.get_file(
-        fname="Stsbenchmark.tar.gz",
-        origin="http://ixa2.si.ehu.es/stswiki/images/4/48/Stsbenchmark.tar.gz",
-        extract=True)
-
-    sts_dev = load_sts_dataset(os.path.join(os.path.dirname(sts_dataset), "stsbenchmark", "sts-dev.csv"))
-    sts_test = load_sts_dataset(os.path.join(os.path.dirname(sts_dataset), "stsbenchmark", "sts-test.csv"))
-
-    return sts_dev, sts_test
-
-def download_sick(f): 
-
-    response = requests.get(f).text
-
-    lines = response.split("\n")[1:]
-    lines = [l.split("\t") for l in lines if len(l) > 0]
-    lines = [l for l in lines if len(l) == 5]
-
-    df = pd.DataFrame(lines, columns=["idx", "sent_1", "sent_2", "sim", "label"])
-    df['sim'] = pd.to_numeric(df['sim'])
-    return df
-
+#method 1
 def run_avg_benchmark(sentences1, sentences2, model=None, use_stoplist=False, doc_freqs=None): 
 
     if doc_freqs is not None:
@@ -64,8 +39,8 @@ def run_avg_benchmark(sentences1, sentences2, model=None, use_stoplist=False, do
     sims = []
     for (sent1, sent2) in zip(sentences1, sentences2):
     
-        tokens1 = sent1.tokens_without_stop if use_stoplist else sent1.tokens
-        tokens2 = sent2.tokens_without_stop if use_stoplist else sent2.tokens
+        tokens1 = sent1.tokens_without_stop if use_stoplist else sent1
+        tokens2 = sent2.tokens_without_stop if use_stoplist else sent2
 
         tokens1 = [token for token in tokens1 if token in model]
         tokens2 = [token for token in tokens2 if token in model]
@@ -87,148 +62,33 @@ def run_avg_benchmark(sentences1, sentences2, model=None, use_stoplist=False, do
 
         sim = cosine_similarity(embedding1, embedding2)[0][0]
         sims.append(sim)
-
+    print (sum(sims) / float(len(sims)))
     return sims
 
-def run_wmd_benchmark(sentences1, sentences2, model, use_stoplist=False):
-    
-    sims = []
-    for (sent1, sent2) in zip(sentences1, sentences2):
-    
-        tokens1 = sent1.tokens_without_stop if use_stoplist else sent1.tokens
-        tokens2 = sent2.tokens_without_stop if use_stoplist else sent2.tokens
-        
-        tokens1 = [token for token in tokens1 if token in model]
-        tokens2 = [token for token in tokens2 if token in model]
-        
-        if len(tokens1) == 0 or len(tokens2) == 0:
-            tokens1 = [token for token in sent1.tokens if token in model]
-            tokens2 = [token for token in sent2.tokens if token in model]
-            
-        sims.append(-model.wmdistance(tokens1, tokens2))
-        
-    return sims  
 
-def remove_first_principal_component(X):
-    svd = TruncatedSVD(n_components=1, n_iter=7, random_state=0)
-    svd.fit(X)
-    pc = svd.components_
-    XX = X - X.dot(pc.transpose()) * pc
-    return XX
+#method 3
+def findSentiment(sentense):
+    client = language.LanguageServiceClient()
+
+    document = types.Document(
+        content=sentense,
+        type=enums.Document.Type.PLAIN_TEXT)
+    jsonStr = client.analyze_sentiment(document=document)
+
+    return jsonStr.document_sentiment.score
 
 
-def run_sif_benchmark(sentences1, sentences2, model, freqs={}, use_stoplist=False, a=0.001): 
-    total_freq = sum(freqs.values())
-    
-    embeddings = []
-    
-    # SIF requires us to first collect all sentence embeddings and then perform 
-    # common component analysis.
-    for (sent1, sent2) in zip(sentences1, sentences2): 
-        
-        tokens1 = sent1.tokens_without_stop if use_stoplist else sent1.tokens
-        tokens2 = sent2.tokens_without_stop if use_stoplist else sent2.tokens
-        
-        tokens1 = [token for token in tokens1 if token in model]
-        tokens2 = [token for token in tokens2 if token in model]
-        
-        weights1 = [a/(a+freqs.get(token,0)/total_freq) for token in tokens1]
-        weights2 = [a/(a+freqs.get(token,0)/total_freq) for token in tokens2]
-        
-        embedding1 = np.average([model[token] for token in tokens1], axis=0, weights=weights1)
-        embedding2 = np.average([model[token] for token in tokens2], axis=0, weights=weights2)
-        
-        embeddings.append(embedding1)
-        embeddings.append(embedding2)
-        
-    embeddings = remove_first_principal_component(np.array(embeddings))
-    sims = [cosine_similarity(embeddings[idx*2].reshape(1, -1), 
-                              embeddings[idx*2+1].reshape(1, -1))[0][0] 
-            for idx in range(int(len(embeddings)/2))]
+def download_sick(f): 
 
-    return sims  
+    response = requests.get(f).text
 
-def run_inf_benchmark(sentences1, sentences2):
-    
-    raw_sentences1 = [sent1.raw for sent1 in sentences1]
-    raw_sentences2 = [sent2.raw for sent2 in sentences2]
-    
-    infersent.build_vocab(raw_sentences1 + raw_sentences2, tokenize=True)
-    embeddings1 = infersent.encode(raw_sentences1, tokenize=True)
-    embeddings2 = infersent.encode(raw_sentences2, tokenize=True)
-    
-    inf_sims = []
-    for (emb1, emb2) in zip(embeddings1, embeddings2): 
-        sim = cosine_similarity(emb1.reshape(1, -1), emb2.reshape(1, -1))[0][0]
-        inf_sims.append(sim)
+    lines = response.split("\n")[1:]
+    lines = [l.split("\t") for l in lines if len(l) > 0]
+    lines = [l for l in lines if len(l) == 5]
 
-    return inf_sims
-
-def run_gse_benchmark(sentences1, sentences2):
-    sts_input1 = tf.placeholder(tf.string, shape=(None))
-    sts_input2 = tf.placeholder(tf.string, shape=(None))
-
-    sts_encode1 = tf.nn.l2_normalize(embed(sts_input1))
-    sts_encode2 = tf.nn.l2_normalize(embed(sts_input2))
-        
-    sim_scores = tf.reduce_sum(tf.multiply(sts_encode1, sts_encode2), axis=1)
-    
-    with tf.Session() as session:
-        session.run(tf.global_variables_initializer())
-        session.run(tf.tables_initializer())
-      
-        [gse_sims] = session.run(
-            [sim_scores],
-            feed_dict={
-                sts_input1: [sent1.raw for sent1 in sentences1],
-                sts_input2: [sent2.raw for sent2 in sentences2]
-            })
-    return gse_sims
-
-def run_experiment(df, benchmarks): 
-    
-    sentences1 = [Sentence(s) for s in df['sent_1']]
-    sentences2 = [Sentence(s) for s in df['sent_2']]
-    
-    pearson_cors, spearman_cors = [], []
-    for label, method in benchmarks:
-        sims = method(sentences1, sentences2)
-        pearson_correlation = scipy.stats.pearsonr(sims, df['sim'])[0]
-        print(label, pearson_correlation)
-        pearson_cors.append(pearson_correlation)
-        spearman_correlation = scipy.stats.spearmanr(sims, df['sim'])[0]
-        spearman_cors.append(spearman_correlation)
-        
-    return pearson_cors, spearman_cors 
-
-sts_dev, sts_test = download_and_load_sts_data()
-    
-sick_train = download_sick("https://raw.githubusercontent.com/alvations/stasis/master/SICK-data/SICK_train.txt")
-sick_dev = download_sick("https://raw.githubusercontent.com/alvations/stasis/master/SICK-data/SICK_trial.txt")
-sick_test = download_sick("https://raw.githubusercontent.com/alvations/stasis/master/SICK-data/SICK_test_annotated.txt")
-sick_all = sick_train.append(sick_test).append(sick_dev)
-
-STOP = nltk.download('stopwords')
-
-class Sentence:
-    
-    def __init__(self, sentence):
-        self.raw = sentence
-        normalized_sentence = sentence.replace("‘", "'").replace("’", "'")
-        self.tokens = [t.lower() for t in nltk.word_tokenize(normalized_sentence)]
-        self.tokens_without_stop = [t for t in self.tokens if t not in STOP]
-
-PATH_TO_WORD2VEC = os.path.expanduser("E:\\hackathon\\GoogleNews-vectors-negative300.bin")
-PATH_TO_GLOVE = os.path.expanduser("~\\downloads\\data\\glove\\glove.840B.300d.txt")
-
-word2vec = gensim.models.KeyedVectors.load_word2vec_format(PATH_TO_WORD2VEC, binary=True)
-
-tmp_file = "/tmp/glove.840B.300d.w2v.txt"
-glove2word2vec(PATH_TO_GLOVE, tmp_file)
-glove = gensim.models.KeyedVectors.load_word2vec_format(tmp_file)
-
-PATH_TO_FREQUENCIES_FILE = "data/sentence_similarity/frequencies.tsv"
-PATH_TO_DOC_FREQUENCIES_FILE = "data/sentence_similarity/doc_frequencies.tsv"
+    df = pd.DataFrame(lines, columns=["idx", "sent_1", "sent_2", "sim", "label"])
+    df['sim'] = pd.to_numeric(df['sim'])
+    return df
 
 def read_tsv(f):
     frequencies = {}
@@ -238,36 +98,291 @@ def read_tsv(f):
             frequencies[row[0]] = int(row[1])
         
     return frequencies
+
+
+def tokenize(q1, q2):
+    """
+        q1 and q2 are sentences/questions. Function returns a list of tokens for both.
+    """
+    return word_tokenize(q1), word_tokenize(q2)
+
+
+def posTag(q1, q2):
+    """
+        q1 and q2 are lists. Function returns a list of POS tagged tokens for both.
+    """
+    return nltk.pos_tag(q1), nltk.pos_tag(q2)
+
+
+def stemmer(tag_q1, tag_q2):
+    """
+        tag_q = tagged lists. Function returns a stemmed list.
+    """
+
+    stem_q1 = []
+    stem_q2 = []
+
+    for token in tag_q1:
+        stem_q1.append(stem(token))
+
+    for token in tag_q2:
+        stem_q2.append(stem(token))
+
+    return stem_q1, stem_q2
+
+
+
+def path(set1, set2):
+    return wn.path_similarity(set1, set2)
+
+
+def wup(set1, set2):
+    return wn.wup_similarity(set1, set2)
+
+
+def edit(word1, word2):
+    if float(edit_distance(word1, word2)) == 0.0:
+        return 0.0
+    return 1.0 / float(edit_distance(word1, word2))
+
+def computePath(q1, q2):
+
+    R = np.zeros((len(q1), len(q2)))
+
+    for i in range(len(q1)):
+        for j in range(len(q2)):
+            if q1[i][1] == None or q2[j][1] == None:
+                sim = edit(q1[i][0], q2[j][0])
+            else:
+                sim = path(wn.synset(q1[i][1]), wn.synset(q2[j][1]))
+
+            if sim == None:
+                sim = edit(q1[i][0], q2[j][0])
+
+            R[i, j] = sim
+
+    # print R
+
+    return R
+
+def computeWup(q1, q2):
+
+    R = np.zeros((len(q1), len(q2)))
+
+    for i in range(len(q1)):
+        for j in range(len(q2)):
+            if q1[i][1] == None or q2[j][1] == None:
+                sim = edit(q1[i][0], q2[j][0])
+            else:
+                sim = wup(wn.synset(q1[i][1]), wn.synset(q2[j][1]))
+
+            if sim == None:
+                sim = edit(q1[i][0], q2[j][0])
+
+            R[i, j] = sim
+
+    # print R
+
+    return R
+
+
+def overallSim(q1, q2, R):
+
+    sum_X = 0.0
+    sum_Y = 0.0
+
+    for i in range(len(q1)):
+        max_i = 0.0
+        for j in range(len(q2)):
+            if R[i, j] > max_i:
+                max_i = R[i, j]
+        sum_X += max_i
+
+    for i in range(len(q1)):
+        max_j = 0.0
+        for j in range(len(q2)):
+            if R[i, j] > max_j:
+                max_j = R[i, j]
+        sum_Y += max_j
         
+    if (float(len(q1)) + float(len(q2))) == 0.0:
+        return 0.0
+        
+    overall = (sum_X + sum_Y) / (2 * (float(len(q1)) + float(len(q2))))
+
+    return overall
+
+
+def semanticSimilarity(q1, q2):
+
+    tokens_q1, tokens_q2 = tokenize(q1, q2)
+    # stem_q1, stem_q2 = stemmer(tokens_q1, tokens_q2)
+    tag_q1, tag_q2 = posTag(tokens_q1, tokens_q2)
+
+    sentence = []
+    for i, word in enumerate(tag_q1):
+        if 'NN' in word[1] or 'JJ' in word[1] or 'VB' in word[1]:
+            sentence.append(word[0])
+
+    sense1 = Lesk(sentence)
+    sentence1Means = []
+    for word in sentence:
+        sentence1Means.append(sense1.lesk(word, sentence))
+
+    sentence = []
+    for i, word in enumerate(tag_q2):
+        if 'NN' in word[1] or 'JJ' in word[1] or 'VB' in word[1]:
+            sentence.append(word[0])
+
+    sense2 = Lesk(sentence)
+    sentence2Means = []
+    for word in sentence:
+        sentence2Means.append(sense2.lesk(word, sentence))
+    # for i, word in enumerate(sentence1Means):
+    #     print sentence1Means[i][0], sentence2Means[i][0]
+
+    R1 = computePath(sentence1Means, sentence2Means)
+    R2 = computeWup(sentence1Means, sentence2Means)
+
+    R = (R1 + R2) / 2
+
+    # print R
+
+    return overallSim(sentence1Means, sentence2Means, R)
+
+def clean_sentence(val):
+    "remove chars that are not letters or numbers, downcase, then remove stop words"
+    regex = re.compile('([^\s\w]|_)+')
+    sentence = regex.sub('', val).lower()
+    sentence = sentence.split(" ")
+
+    for word in list(sentence):
+        if word in STOP_WORDS:
+            sentence.remove(word)
+
+    sentence = " ".join(sentence)
+    return sentence
+
+class Lesk(object):
+
+    def __init__(self, sentence):
+        self.sentence = sentence
+        self.meanings = {}
+        for word in sentence:
+            self.meanings[word] = ''
+
+    def getSenses(self, word):
+        # print word
+        return wn.synsets(word.lower())
+
+    def getGloss(self, senses):
+
+        gloss = {}
+
+        for sense in senses:
+            gloss[sense.name()] = []
+
+        for sense in senses:
+            gloss[sense.name()] += word_tokenize(sense.definition())
+
+        return gloss
+
+    def getAll(self, word):
+        senses = self.getSenses(word)
+
+        if senses == []:
+            return {word.lower(): senses}
+
+        return self.getGloss(senses)
+
+    def Score(self, set1, set2):
+        # Base
+        overlap = 0
+
+        # Step
+        for word in set1:
+            if word in set2:
+                overlap += 1
+
+        return overlap
+
+    def overlapScore(self, word1, word2):
+
+        gloss_set1 = self.getAll(word1)
+        if self.meanings[word2] == '':
+            gloss_set2 = self.getAll(word2)
+        else:
+            # print 'here'
+            gloss_set2 = self.getGloss([wn.synset(self.meanings[word2])])
+
+        # print gloss_set2
+
+        score = {}
+        for i in gloss_set1.keys():
+            score[i] = 0
+            for j in gloss_set2.keys():
+                score[i] += self.Score(gloss_set1[i], gloss_set2[j])
+
+        bestSense = None
+        max_score = 0
+        for i in gloss_set1.keys():
+            if score[i] > max_score:
+                max_score = score[i]
+                bestSense = i
+
+        return bestSense, max_score
+
+    def lesk(self, word, sentence):
+        maxOverlap = 0
+        context = sentence
+        word_sense = []
+        meaning = {}
+
+        senses = self.getSenses(word)
+
+        for sense in senses:
+            meaning[sense.name()] = 0
+
+        for word_context in context:
+            if not word == word_context:
+                score = self.overlapScore(word, word_context)
+                if score[0] == None:
+                    continue
+                meaning[score[0]] += score[1]
+
+        if senses == []:
+            return word, None, None
+
+        self.meanings[word] = max(meaning.keys(), key=lambda x: meaning[x])
+
+        return word, self.meanings[word], wn.synset(self.meanings[word]).definition()
+
+
+
+sick_train = download_sick("https://raw.githubusercontent.com/alvations/stasis/master/SICK-data/SICK_train.txt")
+sick_dev = download_sick("https://raw.githubusercontent.com/alvations/stasis/master/SICK-data/SICK_trial.txt")
+sick_test = download_sick("https://raw.githubusercontent.com/alvations/stasis/master/SICK-data/SICK_test_annotated.txt")
+sick_all = sick_train.append(sick_test).append(sick_dev)
+
+
+PATH_TO_WORD2VEC = os.path.expanduser("D:\\Backup\\nlp-notebooks-master\\data\\sentence_similarity\\GoogleNews-vectors-negative300.bin")
+PATH_TO_GLOVE = os.path.expanduser("D:\\Backup\\nlp-notebooks-master\\data\\sentence_similarity\\glove.840B.300d.txt")
+
+PATH_TO_FREQUENCIES_FILE = "D:\\Backup\\nlp-notebooks-master\\data\\sentence_similarity\\frequencies.tsv"
+PATH_TO_DOC_FREQUENCIES_FILE = "D:\\Backup\\nlp-notebooks-master\\data\\sentence_similarity\\doc_frequencies.tsv"
+
+
+
+word2vec = gensim.models.KeyedVectors.load_word2vec_format(PATH_TO_WORD2VEC, binary=True)
+
+
 frequencies = read_tsv(PATH_TO_FREQUENCIES_FILE)
 doc_frequencies = read_tsv(PATH_TO_DOC_FREQUENCIES_FILE)
 doc_frequencies["NUM_DOCS"] = 1288431
 
-!wget -nc https://raw.githubusercontent.com/facebookresearch/SentEval/master/examples/models.py
-!wget -nc https://s3.amazonaws.com/senteval/infersent/infersent.allnli.pickle
+word_vectors = api.load("glove-wiki-gigaword-100")
 
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"]="C:/astral-shape-187315-e8e3ba35bd82.json"
 
-infersent = torch.load('infersent.allnli.pickle', map_location=lambda storage, loc: storage)
-infersent.use_cuda = False
-infersent.set_glove_path(PATH_TO_GLOVE)
-
-tf.logging.set_verbosity(tf.logging.ERROR)
-embed = hub.Module("https://tfhub.dev/google/universal-sentence-encoder/1")
-
-benchmarks = [("AVG-W2V", ft.partial(run_avg_benchmark, model=word2vec, use_stoplist=False)),
-              ("AVG-W2V-STOP", ft.partial(run_avg_benchmark, model=word2vec, use_stoplist=True)),
-              ("AVG-W2V-TFIDF", ft.partial(run_avg_benchmark, model=word2vec, use_stoplist=False, doc_freqs=doc_frequencies)),
-              ("AVG-W2V-TFIDF-STOP", ft.partial(run_avg_benchmark, model=word2vec, use_stoplist=True, doc_freqs=doc_frequencies)),
-              ("AVG-GLOVE", ft.partial(run_avg_benchmark, model=glove, use_stoplist=False)),
-              ("AVG-GLOVE-STOP", ft.partial(run_avg_benchmark, model=glove, use_stoplist=True)),
-              ("AVG-GLOVE-TFIDF", ft.partial(run_avg_benchmark, model=glove, use_stoplist=False, doc_freqs=doc_frequencies)),
-              ("AVG-GLOVE-TFIDF-STOP", ft.partial(run_avg_benchmark, model=glove, use_stoplist=True, doc_freqs=doc_frequencies)),
-              ("WMD-W2V", ft.partial(run_wmd_benchmark, model=word2vec, use_stoplist=False)), 
-              ("WMD-W2V-STOP", ft.partial(run_wmd_benchmark, model=word2vec, use_stoplist=True)), 
-              ("WMD-GLOVE", ft.partial(run_wmd_benchmark, model=glove, use_stoplist=False)), 
-              ("WMD-GLOVE-STOP", ft.partial(run_wmd_benchmark, model=glove, use_stoplist=True)), 
-              ("SIF-W2V", ft.partial(run_sif_benchmark, freqs=frequencies, model=word2vec, use_stoplist=False)),
-              ("SIF-GLOVE", ft.partial(run_sif_benchmark, freqs=frequencies, model=glove, use_stoplist=False)), 
-              ("INF", run_inf_benchmark),
-              ("GSE", run_gse_benchmark)]
+STOP_WORDS = nltk.download('stopwords')
 
