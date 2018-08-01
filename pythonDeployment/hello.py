@@ -33,15 +33,13 @@ def sen_sim(sen):
     model_sentiment = lib.findSentiment(modelAns)
     act_sentiment = lib.findSentiment(actAns)
     
-
-    
-    avg_bench_mark = lib.run_avg_benchmark(modelAns, actAns,model=word2vec)
-    vector_dist = lib.word_vectors.wmdistance(modelAns, actAns)
+    avg_bench_mark = 0#lib.run_avg_benchmark(modelAns, actAns,model=word2vec)  #need to put bin file to s3
+    vector_dist =  lib.word_vectors.wmdistance(modelAns, actAns)   #need to install pyemd
     sementi_similarity = lib.semanticSimilarity(modelAns, actAns)
 
     ans = lib.callMe()
     #call sentense similarity function from main model
-    return actAns + '   ' + modelAns + '   ' + Float.toString(model_sentiment) + '  ' + Float.toString(act_sentiment) + '   ' + Float.toString(avg_bench_mark) + '  ' + Float.toString(vector_dist) + '   ' + Float.toString(sementi_similarity)
+    return actAns + '   ' + modelAns + '   ' + str(model_sentiment) + '  ' + str(act_sentiment) + '   ' + str(avg_bench_mark) + '  ' + str(vector_dist) + '   ' + str(sementi_similarity)
 
 
 def implModel(content):
