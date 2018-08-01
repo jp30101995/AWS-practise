@@ -1,9 +1,9 @@
+#!/usr/bin/python
 import pandas as pd
 import numpy as np
 import scipy
 import math
 import os
-import tensorflow as tf
 import matplotlib.pyplot as plt
 import seaborn as sns
 import requests
@@ -27,7 +27,8 @@ from subprocess import check_output
 from nltk.metrics import edit_distance
 
 
-
+def callMe():
+    return 'you called me'
 
 
 #method 1
@@ -366,19 +367,19 @@ sick_all = sick_train.append(sick_test).append(sick_dev)
 
 
 PATH_TO_WORD2VEC = os.path.expanduser("D:\\Backup\\nlp-notebooks-master\\data\\sentence_similarity\\GoogleNews-vectors-negative300.bin")
-PATH_TO_GLOVE = os.path.expanduser("D:\\Backup\\nlp-notebooks-master\\data\\sentence_similarity\\glove.840B.300d.txt")
+#PATH_TO_GLOVE = os.path.expanduser("D:\\Backup\\nlp-notebooks-master\\data\\sentence_similarity\\glove.840B.300d.txt")
 
-PATH_TO_FREQUENCIES_FILE = "D:\\Backup\\nlp-notebooks-master\\data\\sentence_similarity\\frequencies.tsv"
-PATH_TO_DOC_FREQUENCIES_FILE = "D:\\Backup\\nlp-notebooks-master\\data\\sentence_similarity\\doc_frequencies.tsv"
+# PATH_TO_FREQUENCIES_FILE = "D:\\Backup\\nlp-notebooks-master\\data\\sentence_similarity\\frequencies.tsv"
+# PATH_TO_DOC_FREQUENCIES_FILE = "D:\\Backup\\nlp-notebooks-master\\data\\sentence_similarity\\doc_frequencies.tsv"
 
 
 
 word2vec = gensim.models.KeyedVectors.load_word2vec_format(PATH_TO_WORD2VEC, binary=True)
 
 
-frequencies = read_tsv(PATH_TO_FREQUENCIES_FILE)
-doc_frequencies = read_tsv(PATH_TO_DOC_FREQUENCIES_FILE)
-doc_frequencies["NUM_DOCS"] = 1288431
+# frequencies = read_tsv(PATH_TO_FREQUENCIES_FILE)
+# doc_frequencies = read_tsv(PATH_TO_DOC_FREQUENCIES_FILE)
+# doc_frequencies["NUM_DOCS"] = 1288431
 
 word_vectors = api.load("glove-wiki-gigaword-100")
 
@@ -386,3 +387,6 @@ os.environ["GOOGLE_APPLICATION_CREDENTIALS"]="C:/astral-shape-187315-e8e3ba35bd8
 
 STOP_WORDS = nltk.download('stopwords')
 
+nltk.download('punkt')
+nltk.download('averaged_perceptron_tagger')
+nltk.download('wordnet')

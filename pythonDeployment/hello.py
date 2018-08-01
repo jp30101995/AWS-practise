@@ -5,6 +5,7 @@ from sklearn import datasets, linear_model
 from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.externals import joblib
 app = Flask(__name__)
+import lib
 
 @app.route("/")
 def hello():
@@ -13,13 +14,34 @@ def hello():
 @app.route('/predict/<nm>',methods = ['POST', 'GET'])
 def login(nm):
    if request.method == 'POST':
-       content = request.form["name"]
+       #content = request.form["name"]
+       content = request.get_json(force=True)
+       #print('sdasdasdasdasdas')
        return implModel(content)
-       #return content
+       #return content['name']
    else:
        user = request.args.get('nm')
        return user
 
+
+@app.route('/sen_sim/<sen>',methods = ['POST', 'GET'])
+def sen_sim(sen):
+    data = request.get_json(force=True)
+    modelAns = data['modelAns']
+    actAns = data['actAns']
+
+    model_sentiment = lib.findSentiment(modelAns)
+    act_sentiment = lib.findSentiment(actAns)
+    
+
+    
+    avg_bench_mark = lib.run_avg_benchmark(modelAns, actAns,model=word2vec)
+    vector_dist = lib.word_vectors.wmdistance(modelAns, actAns)
+    sementi_similarity = lib.semanticSimilarity(modelAns, actAns)
+
+    ans = lib.callMe()
+    #call sentense similarity function from main model
+    return actAns + '   ' + modelAns + '   ' + Float.toString(model_sentiment) + '  ' + Float.toString(act_sentiment) + '   ' + Float.toString(avg_bench_mark) + '  ' + Float.toString(vector_dist) + '   ' + Float.toString(sementi_similarity)
 
 
 def implModel(content):
@@ -54,13 +76,6 @@ def implModel(content):
     # reg = linear_model.LinearRegression()
     # reg.fit ([[0, 0], [1, 1], [2, 2]], [0, 1, 2])
     # return reg.coef_
-
-
-@app.route('/sen_sim/<sen>',methods = ['POST', 'GET'])
-def sen_sim(sen):
-    user = request.args.get('sen')
-    #call sentense similarity function from main model
-    return user
 
 
 if __name__ == "__main__":
