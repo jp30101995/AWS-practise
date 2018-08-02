@@ -35,7 +35,7 @@ def sen_sim(sen):
     model_sentiment = lib.findSentiment(modelAns)
     act_sentiment = lib.findSentiment(actAns)
     
-    avg_bench_mark = 0#lib.run_avg_benchmark(modelAns, actAns,model=word2vec)  #need to put bin file to s3
+    avg_bench_mark = lib.run_avg_benchmark(modelAns, actAns,model=word2vec)  #need to put bin file to s3
     vector_dist =  lib.word_vectors.wmdistance(modelAns, actAns)   #need to install pyemd
     sementi_similarity = lib.semanticSimilarity(modelAns, actAns)
 
