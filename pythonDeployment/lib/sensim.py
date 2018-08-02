@@ -387,6 +387,6 @@ os.environ["GOOGLE_APPLICATION_CREDENTIALS"]="/astral-shape-187315-e8e3ba35bd82.
 
 STOP_WORDS = nltk.download('stopwords')
 
-#nltk.download('punkt')
-#nltk.download('averaged_perceptron_tagger')
-#nltk.download('wordnet')
+nltk.download('punkt')
+nltk.download('averaged_perceptron_tagger')
+nltk.download('wordnet')
