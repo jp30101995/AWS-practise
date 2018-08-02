@@ -7,7 +7,7 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 
 # Load the diabetes dataset
-df=pd.read_csv("D:\Hackathon\\trainingtestingdata.csv")
+df=pd.read_csv("https://s3-ap-southeast-1.amazonaws.com/data-for-models-python/data/trainingtestingdata.csv")
 # Use only one feature
 y=df.model
 X=df.drop('model',axis=1)
