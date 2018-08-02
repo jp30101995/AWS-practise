@@ -7,7 +7,7 @@ from sklearn.externals import joblib
 import pandas as pd
 from sklearn.model_selection import train_test_split
 app = Flask(__name__)
-#import lib
+import lib
 
 @app.route("/")
 def hello():
