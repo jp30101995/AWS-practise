@@ -383,7 +383,7 @@ sick_all = sick_train.append(sick_test).append(sick_dev)
 
 word_vectors = api.load("glove-wiki-gigaword-100")
 
-#os.environ["GOOGLE_APPLICATION_CREDENTIALS"]="C:/astral-shape-187315-e8e3ba35bd82.json"
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"]="/astral-shape-187315-e8e3ba35bd82.json"
 
 #STOP_WORDS = nltk.download('stopwords')
 
