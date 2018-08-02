@@ -366,7 +366,7 @@ sick_test = download_sick("https://raw.githubusercontent.com/alvations/stasis/ma
 sick_all = sick_train.append(sick_test).append(sick_dev)
 
 
-#PATH_TO_WORD2VEC = os.path.expanduser("D:\\Backup\\nlp-notebooks-master\\data\\sentence_similarity\\GoogleNews-vectors-negative300.bin")
+PATH_TO_WORD2VEC = os.path.expanduser("/mount/data/GoogleNews-vectors-negative300.bin")
 #PATH_TO_GLOVE = os.path.expanduser("D:\\Backup\\nlp-notebooks-master\\data\\sentence_similarity\\glove.840B.300d.txt")
 
 # PATH_TO_FREQUENCIES_FILE = "D:\\Backup\\nlp-notebooks-master\\data\\sentence_similarity\\frequencies.tsv"
@@ -374,7 +374,7 @@ sick_all = sick_train.append(sick_test).append(sick_dev)
 
 
 
-#word2vec = gensim.models.KeyedVectors.load_word2vec_format(PATH_TO_WORD2VEC, binary=True)
+word2vec = gensim.models.KeyedVectors.load_word2vec_format(PATH_TO_WORD2VEC, binary=True)
 
 
 # frequencies = read_tsv(PATH_TO_FREQUENCIES_FILE)
