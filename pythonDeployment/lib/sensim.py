@@ -381,7 +381,7 @@ sick_all = sick_train.append(sick_test).append(sick_dev)
 # doc_frequencies = read_tsv(PATH_TO_DOC_FREQUENCIES_FILE)
 # doc_frequencies["NUM_DOCS"] = 1288431
 
-#word_vectors = api.load("glove-wiki-gigaword-100")
+word_vectors = api.load("glove-wiki-gigaword-100")
 
 #os.environ["GOOGLE_APPLICATION_CREDENTIALS"]="C:/astral-shape-187315-e8e3ba35bd82.json"
 
