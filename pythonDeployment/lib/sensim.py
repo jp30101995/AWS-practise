@@ -385,7 +385,7 @@ word_vectors = api.load("glove-wiki-gigaword-100")
 
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"]="/astral-shape-187315-e8e3ba35bd82.json"
 
-#STOP_WORDS = nltk.download('stopwords')
+STOP_WORDS = nltk.download('stopwords')
 
 #nltk.download('punkt')
 #nltk.download('averaged_perceptron_tagger')
