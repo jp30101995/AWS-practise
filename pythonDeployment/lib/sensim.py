@@ -383,7 +383,7 @@ word2vec = gensim.models.KeyedVectors.load_word2vec_format(PATH_TO_WORD2VEC, bin
 
 word_vectors = api.load("glove-wiki-gigaword-100")
 
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"]="/astral-shape-187315-e8e3ba35bd82.json"
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"]="/mount/data/astral-shape-187315-e8e3ba35bd82.json"
 
 STOP_WORDS = nltk.download('stopwords')
 
