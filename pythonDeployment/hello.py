@@ -5,7 +5,7 @@ from sklearn import datasets, linear_model
 from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.externals import joblib
 app = Flask(__name__)
-import lib
+#import lib
 
 @app.route("/")
 def hello():
